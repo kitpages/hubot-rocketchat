@@ -6,6 +6,8 @@ RUN npm install -g coffee-script yo generator-hubot  &&  \
 
 USER hubot
 
+EXPOSE 8080
+
 WORKDIR /home/hubot
 
 ENV DEV false
