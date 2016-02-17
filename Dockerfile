@@ -16,7 +16,7 @@ ENV BOT_NAME "rocketbot"
 ENV BOT_OWNER "No owner specified"
 ENV BOT_DESC "Hubot with rocketbot adapter"
 
-ENV EXTERNAL_SCRIPTS=hubot-diagnostics,hubot-help,hubot-google-images,hubot-google-translate,hubot-pugme,hubot-maps,hubot-gitlab-hooks,hubot-bs-random,hubot-eightball-fr,hubot-voting,hubot-digweb,hubot-neige,hubot-trollbot,hubot-help
+ENV EXTERNAL_SCRIPTS=hubot-sentry,hubot-diagnostics,hubot-help,hubot-google-images,hubot-google-translate,hubot-pugme,hubot-maps,hubot-gitlab-hooks,hubot-bs-random,hubot-eightball-fr,hubot-voting,hubot-digweb,hubot-neige,hubot-trollbot,hubot-help
 
 RUN yo hubot --owner="$BOT_OWNER" --name="$BOT_NAME" --description="$BOT_DESC" --defaults && \
 	sed -i /heroku/d ./external-scripts.json && \
