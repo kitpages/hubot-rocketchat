@@ -21,7 +21,7 @@ ENV EXTERNAL_SCRIPTS=hubot-sentry,hubot-diagnostics,hubot-help,hubot-google-imag
 RUN yo hubot --owner="$BOT_OWNER" --name="$BOT_NAME" --description="$BOT_DESC" --defaults && \
 	sed -i /heroku/d ./external-scripts.json && \
 	sed -i /redis-brain/d ./external-scripts.json && \
-	npm install hubot-rocketchat && \
+	npm install https://github.com/RocketChat/hubot-rocketchat.git#3ab69ad51d29f90067b62311aa9cbaf2a2dbcc25 && \
 	npm install hubot-scripts
 
 CMD node -e "console.log(JSON.stringify('$EXTERNAL_SCRIPTS'.split(',')))" > external-scripts.json && \
