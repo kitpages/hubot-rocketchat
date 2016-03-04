@@ -36,17 +36,10 @@ class RocketChatDriver
 		return r.updated
 
 	sendMessage: (text, roomid) =>
+		@logger.info "Sending Message To Room: #{roomid}"
 
-		r = @getRoomId roomid
-
-		r.then ((result) =>
-
-			@logger.info "Sending Message To Room: #{roomid} (#{result})"
-
-			@asteroid.call('sendMessage', {msg: text, rid: result})
-
-		)
-
+		@asteroid.call('sendMessage', {msg: text, rid: roomid})
+		
 	customMessage: (message) =>
 		@logger.info "Sending Custom Message To Room: #{message.channel}"
 
