@@ -1,10 +1,22 @@
+# Adding some documentation
+# Adding something else
+
 Asteroid = require 'asteroid'
+Q = require 'q'
+LRU = require('lru-cache')
 
 # TODO:   need to grab these values from process.env[]
 
 _msgsubtopic = 'stream-messages' # 'messages'
 _msgsublimit = 10   # this is not actually used right now
 _messageCollection = 'stream-messages'
+
+# room id cache
+_roomCacheSize = parseInt(process.env.ROOM_ID_CACHE_SIZE) || 10
+_directMessageRoomCacheSize = parseInt(process.env.DM_ROOM_ID_CACHE_SIZE) || 100
+_cacheMaxAge = parseInt(process.env.ROOM_ID_CACHE_MAX_AGE) || 300
+_roomIdCache = LRU( max: _roomCacheSize, maxAge: 1000 * _cacheMaxAge )
+_directMessageRoomIdCache = LRU( max: _directMessageRoomCacheSize, maxAge: 1000 * _cacheMaxAge )
 
 # driver specific to Rocketchat hubot integration
 # plugs into generic rocketchatbotadapter
@@ -21,12 +33,24 @@ class RocketChatDriver
 		@asteroid.on 'connected', ->
 			cb()
 
-	getRoomId: (roomid) =>
-		@logger.info "Looking up Room ID for: #{roomid}"
+	getRoomId: (room) =>
+		@tryCache _roomIdCache, 'getRoomIdByNameOrId', room, 'Room ID'
 
-		r = @asteroid.call 'getRoomIdByNameOrId', roomid
+	getDirectMessageRoomId: (username) =>
+		@tryCache _directMessageRoomIdCache, 'createDirectMessage', username, 'DM Room ID'
 
-		return r.result
+	tryCache: (cacheArray, method, key, name) =>
+		name ?= method
+		cached = cacheArray.get key
+		if cached
+			@logger.debug "Found cached #{name} for #{key}: #{cached}"
+			return Q(cached)
+		else
+			@logger.info "Looking up #{name} for: #{key}"
+			r = @asteroid.call method, key
+			return r.result.then (res) =>
+				cacheArray.set key, res
+				return Q(res)
 
 	joinRoom: (userid, uname, roomid, cb) =>
 		@logger.info "Joining Room: #{roomid}"
@@ -35,11 +59,19 @@ class RocketChatDriver
 
 		return r.updated
 
-	sendMessage: (text, roomid) =>
-		@logger.info "Sending Message To Room: #{roomid}"
+	sendMessage: (text, room) =>
+		@logger.info "Sending Message To Room: #{room}"
+		r = @getRoomId room
+		r.then (roomid) =>
+			@sendMessageByRoomId text, roomid
 
+	sendMessageByRoomId: (text, roomid) =>
 		@asteroid.call('sendMessage', {msg: text, rid: roomid})
-		
+		.then (result)->
+			@logger.debug('[sendMessage] Success:', result)
+		.catch (error) ->
+			@logger.error('[sendMessage] Error:', error)
+
 	customMessage: (message) =>
 		@logger.info "Sending Custom Message To Room: #{message.channel}"
 

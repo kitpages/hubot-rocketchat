@@ -8,6 +8,8 @@
 
 Hubot adapter for Rocket.Chat!
 
+Feel free to join us in the [#hubot](https://demo.rocket.chat/channel/hubot) channel to discuss hubot, and any scripts you might be working on.
+
 #### NOTE
 If you want to integrate Rocket.Chat with GitHub or GitLab.  Make sure you visit the [Rocket.Chat.Ops](https://github.com/RocketChat/Rocket.Chat.Ops) project before starting. We already have many scripts that add webhook events and access GitHub/GitLab APIs. You can easily extend these scripts for your custom application.
 
@@ -67,12 +69,18 @@ npm install -g yo generator-hubot
 Then you need to start the setup of the bot
 
 ```
-% mkdir myhubot
-% cd myhubot
-% yo hubot
+mkdir myhubot
+cd myhubot
+yo hubot --adapter="rocketchat"
 ```
 
-It'll ask you a few questions.  One will ask which adapter.  Put: `rocketchat`
+It'll ask you a few questions.
+
+Alternatively you can actually answer the questions in one command:
+
+```
+yo hubot --owner="OWNER <owner@example.com>" --name="bot" --description="Bot" --adapter="rocketchat"
+```
 
 Also be sure to remember the name you specify.  This is what the bot will respond to in Rocket.Chat.
 
@@ -117,13 +125,16 @@ Regular hubot via: `export VAR=Value` or add to pm2 etc
 
 Environment Variable | Description
 :---- | :----
-ROCKETCHAT_URL | the URL where Rocket.Chat is running, can be specified as `host:port` or `http://host:port`  or `https://host:port`
+ROCKETCHAT_URL | the URL where Rocket.Chat is running, can be specified as `host:port` or `http://host:port`  or `https://host:port`. If you are using `https://`, you **MUST** setup websocket pass-through on your reverse proxy (NGINX, and so on) with a valid certificate (not self-signed).  Directly accessing Rocket.Chat without a reverse proxy via `https://` is not possible.
 ROCKETCHAT_USER | the bot user's name
 ROCKETCHAT_PASSWORD | the bot user's password
 ROCKETCHAT_AUTH | defaults to 'password' if undefinied, or set to 'ldap' if your use LDAP accounts for bots.
 ROCKETCHAT_ROOM | the channel/channels names the bot should listen to message from.  This can be comma separated list.
 LISTEN_ON_ALL_PUBLIC | if 'true' then bot will listen and respond to messages from all public channels, as well as respond to direct messages. Default to 'false'. ROCKETCHAT_ROOM should be set to empty (with `ROCKETCHAT_ROOM=''` ) when using `LISTEN_ON_ALL_PUBLIC`. *IMPORTANT NOTE*:  This option also allows the bot to listen and respond to messages _from all newly created private groups_ that the bot's user has been added as a member.
 RESPOND_TO_DM | if 'true' then bot will listen and respond to direct messages. When setting the option to 'true', be sure to also set ROCKETCHAT_ROOM. This option needs not be set if you are including LISTEN_ON_ALL_PUBLIC.    Default is 'false'.
+ROOM_ID_CACHE_SIZE | The maximum number of room IDs to cache. You can increase this if your bot usually sends messages to a large number of different rooms. Default value: 10
+DM_ROOM_ID_CACHE_SIZE | The maximum number of Direct Message room IDs to cache. You can increase this if your bot usually sends a large number of Direct Messages. Default value: 100
+ROOM_ID_CACHE_MAX_AGE | Room IDs and DM Room IDS are cached for this number of seconds. You can increase this value to improve performance in certain scenarios. Default value: 300
 BOT_NAME | ** Name of the bot.  This is what it responds to
 EXTERNAL_SCRIPTS | ** These are the npm modules it will add to hubot.
 DEV | ** This enables development mode.
