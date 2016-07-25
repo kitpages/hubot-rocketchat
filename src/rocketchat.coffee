@@ -11,6 +11,7 @@ try
 catch
 		prequire = require('parent-require')
 		{Robot,Adapter,TextMessage, EnterMessage, User, Response} = prequire 'hubot'
+pkg = require '../package.json'
 Q = require 'q'
 Chatdriver = require './rocketchat_driver'
 
@@ -20,6 +21,7 @@ RocketChatUser = process.env.ROCKETCHAT_USER or "hubot"
 RocketChatPassword = process.env.ROCKETCHAT_PASSWORD or "password"
 ListenOnAllPublicRooms = process.env.LISTEN_ON_ALL_PUBLIC or "false"
 RespondToDirectMessage = process.env.RESPOND_TO_DM or "false"
+RespondToEditedMessage = (process.env.RESPOND_TO_EDITED or "false").toLowerCase()
 SSLEnabled = "false"
 
 # Custom Response class that adds a sendPrivate and sendDirect method
@@ -29,12 +31,18 @@ class RocketChatResponse extends Response
 	sendPrivate: (strings...) ->
 		@robot.adapter.sendDirect @envelope, strings...
 
+class AttachmentMessage extends TextMessage
+	constructor: (@user, @attachment, @text, @id) ->
+		super @user, @text, @id
+
 class RocketChatBotAdapter extends Adapter
 
 	run: =>
-		@robot.logger.info "Starting Rocketchat adapter..."
+		@robot.logger.info "Starting Rocketchat adapter version #{pkg.version}..."
 
 		@robot.logger.info "Once connected to rooms I will respond to the name: #{@robot.name}"
+		@robot.alias = RocketChatUser unless @robot.name is RocketChatUser || @robot.alias
+		@robot.logger.info "I will also respond to my Rocket.Chat username as an alias: #{ @robot.alias }" unless @robot.alias is false
 
 		@robot.logger.warning "No services ROCKETCHAT_URL provided to Hubot, using #{RocketChatURL}" unless process.env.ROCKETCHAT_URL
 		@robot.logger.warning "No services ROCKETCHAT_ROOM provided to Hubot, using #{RocketChatRoom}" unless process.env.ROCKETCHAT_ROOM
@@ -129,15 +137,41 @@ class RocketChatBotAdapter extends Adapter
 					if (newmsg.u._id isnt userid) || (newmsg.t is 'uj')
 						if (newmsg.rid in room_ids)	|| (ListenOnAllPublicRooms.toLowerCase() is 'true') ||	((RespondToDirectMessage.toLowerCase() is 'true') && (newmsg.rid.indexOf(userid) > -1))
 							curts = new Date(newmsg.ts.$date)
+							if (RespondToEditedMessage is 'true') and (newmsg.editedAt?.$date?)
+								edited = new Date(newmsg.editedAt.$date)
+								curts = if edited > curts then edited else curts
 							@robot.logger.info "Message receive callback id " + newmsg._id + " ts " + curts
-							@robot.logger.info "[Incoming] #{newmsg.u.username}: #{newmsg.msg}"
+							@robot.logger.info "[Incoming] #{newmsg.u.username}: #{if newmsg.file? then newmsg.attachments[0].title else newmsg.msg}"
 
 							if curts > @lastts
 								@lastts = curts
 								if newmsg.t isnt 'uj'
 									user = @robot.brain.userForId newmsg.u._id, name: newmsg.u.username, room: newmsg.rid
-									text = new TextMessage(user, newmsg.msg, newmsg._id)
-									@robot.receive text
+
+									# check for the presence of attachments in the message
+									if newmsg.file? and newmsg.attachments.length
+										attachment = newmsg.attachments[0]
+
+										if attachment.image_url?
+											attachment.link = "#{RocketChatURL}#{attachment.image_url}"
+											attachment.type = 'image'
+										else if attachment.audio_url?
+											attachment.link = "#{RocketChatURL}#{attachment.audio_url}"
+											attachment.type = 'audio'
+										else if attachment.video_url?
+											attachment.link = "#{RocketChatURL}#{attachment.video_url}"
+											attachment.type = 'video'
+
+										message = new AttachmentMessage user, attachment, attachment.title, newmsg._id
+									else
+										message = new TextMessage user, newmsg.msg, newmsg._id
+
+									isDM = newmsg.rid.indexOf(userid) > -1
+									startOfText = if message.text.indexOf('@') == 0 then 1 else 0
+									robotIsNamed = message.text.indexOf(@robot.name) == startOfText || message.text.indexOf(@robot.alias) == startOfText
+									if (isDM and not robotIsNamed)
+										message.text = "#{ @robot.name } #{ message.text }"
+									@robot.receive message
 									@robot.logger.info "Message sent to hubot brain."
 								else	 # enter room message
 									if newmsg.u._id isnt userid
