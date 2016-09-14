@@ -7,9 +7,9 @@ LRU = require('lru-cache')
 
 # TODO:   need to grab these values from process.env[]
 
-_msgsubtopic = 'stream-messages' # 'messages'
+_msgsubtopic = 'stream-room-messages' # 'messages'
 _msgsublimit = 10   # this is not actually used right now
-_messageCollection = 'stream-messages'
+_messageCollection = 'stream-room-messages'
 
 # room id cache
 _roomCacheSize = parseInt(process.env.ROOM_ID_CACHE_SIZE) || 10
@@ -62,14 +62,24 @@ class RocketChatDriver
 
 		return r.updated
 
-	sendMessage: (text, room) =>
+	prepareMessage: (content, roomid) =>
+		@logger.debug "Preparing message from #{ typeof content }"
+		if typeof content is 'string'
+			message = {msg: content, rid: roomid}
+		else
+			message = content
+			message.rid = roomid
+		return message
+
+	sendMessage: (message, room) =>
 		@logger.info "Sending Message To Room: #{room}"
 		r = @getRoomId room
 		r.then (roomid) =>
-			@sendMessageByRoomId text, roomid
+			@sendMessageByRoomId message, roomid
 
-	sendMessageByRoomId: (text, roomid) =>
-		@asteroid.call('sendMessage', {msg: text, rid: roomid})
+	sendMessageByRoomId: (content, roomid) =>
+		message = @prepareMessage content, roomid
+		@asteroid.call('sendMessage', message)
 		.then (result)->
 			@logger.debug('[sendMessage] Success:', result)
 		.catch (error) ->
@@ -85,6 +95,7 @@ class RocketChatDriver
 		# promise returned
 		if process.env.ROCKETCHAT_AUTH is 'ldap'
 			return @asteroid.login
+				ldap: true
 				username: username
 				ldapPass: password
 				ldapOptions: {}
@@ -97,7 +108,7 @@ class RocketChatDriver
 		#  data.roomid
 		# return promise
 		@logger.info "Preparing Meteor Subscriptions.."
-		msgsub = @asteroid.subscribe _msgsubtopic, data.roomid, _msgsublimit
+		msgsub = @asteroid.subscribe _msgsubtopic, data.roomid, true
 		@logger.info "Subscribing to Room: #{data.roomid}"
 		return msgsub.ready
 
@@ -117,7 +128,7 @@ class RocketChatDriver
 				# console.log('changed:', JSON.stringify(changedMsg, null, 2));
 				if changedMsg.args?
 					@logger.info "Message received with ID " + id
-					receiveMessageCallback changedMsg.args[1]
+					receiveMessageCallback changedMsg.args[0], changedMsg.args[1]
 
 	callMethod: (name, args = []) =>
 		@logger.info "Calling: #{name}, #{args.join(', ')}"
